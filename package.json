@@ -1,0 +1,25 @@
+{
+  "name": "servelet",
+  "version": "1.0.0",
+  "description": "A simple module to serve dynamic page modules and static pages",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AdventCoding/servelet.git"
+  },
+  "keywords": [
+    "dynamic",
+    "static",
+    "template literal",
+    "module pages"
+  ],
+  "author": "Michael (https://github.com/AdventCoding/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AdventCoding/servelet/issues"
+  },
+  "homepage": "https://github.com/AdventCoding/servelet#readme"
+}
