@@ -1,6 +1,6 @@
 # servelet
 
-Servelet is a simple module to serve dynamic page modules and static pages. A dynamic page module will export a function that receives a data object that is used to build the dynamic page.
+Servelet is a simple Node.js module to serve dynamic page modules and static pages. A dynamic page module has an exported function that receives a data object that is used to build the dynamic page.
 
 ## Install
 
@@ -65,7 +65,7 @@ servelet.ready = true || false; // If the module has set up all the dynamic and 
 
 ### Methods
 
-#### .serve
+### .serve
 
 Gets the content of dynamic or static pages.
 
@@ -81,7 +81,7 @@ app.get('/about', (req, res) => {
 });
 ```
 
-#### .on && .off
+### .on && .off
 
 Register for events with the 'on' method. To unregister, use the 'off' method, sending in the callback function that was used in the 'on' method.
 
@@ -93,7 +93,7 @@ servelet.on('error', myErrorCallback)
 servelet.off('error', myErrorCallback);
 ```
 
-#### .updateGlobalData
+### .updateGlobalData
 
 Updates the global data object that is sent to all dynamic pages.
 
@@ -110,7 +110,7 @@ module.exports = (data) => `<p>The ID is: ${data.globalData.dynamicId}</p>`;
 // HTML Response: <p>The ID is: 738</p>
 ```
 
-#### .reloadStaticPage
+### .reloadStaticPage
 
 Reload a static page in the servelet cache. This is useful with a GET request to reload one or more static pages that have been altered on the server.
 
@@ -122,4 +122,4 @@ servelet.reloadStaticPage(['index', 'nav'], callback);
 
 ## License
 
-MIT
+[MIT](https://github.com/AdventCoding/servelet/blob/master/LICENSE)

@@ -1,8 +1,14 @@
+'use strict';
+
 const path = require('path'),
 	fs = require('fs'),
 	events = require('events');
 
-class ServeLit {
+/**
+ * Create a new Servelet instance
+ * @class
+ */
+class Servelet {
 	
 	constructor (opts = {}) {
 		
@@ -355,13 +361,14 @@ class ServeLit {
  */
 
 /**
- * A ServeLit module to handle static and dynamic file serving
- * @param {Options} options The options to initiate the ServeLit instance
- * @return {Object} The API properties and methods
+ * Servelet Node.js Module
+ * @author Michael S. Howard
+ * @license MIT
+ * @param {Options} options The options to initiate the servelet instance
  */
 module.exports = (options) => {
 	
-	const serve = new ServeLit(options);
+	const serve = new Servelet(options);
 	
 	return {
 		
@@ -372,7 +379,7 @@ module.exports = (options) => {
 		get error () { return serve.error; },
 		
 		/**
-		 * If the servelit instance is ready to serve
+		 * If the servelet instance is ready to serve
 		 * @return {boolean}
 		 */
 		get ready () { return serve.ready; },
@@ -380,7 +387,7 @@ module.exports = (options) => {
 		/**
 		 * Update the global data object that is passed to all dynamic pages
 		 * @param {Object} data The object to update the dynamic data with
-		 * @return {Object} The servelit instance
+		 * @return {Object} The servelet instance
 		 */
 		updateGlobalData (data) {
 			
@@ -395,7 +402,7 @@ module.exports = (options) => {
 		 * @param {string} page The page name to serve from the views folder
 		 * @param {Object=} data The object to pass into a dynamic page
 		 * @param {function(Error, string)=} callback The optional callback for completion
-		 * @return {Object|string} The servelit instance if using callback, else the page data string
+		 * @return {Object|string} The servelet instance if using callback, else the page data string
 		 */
 		serve (page, data = {}, callback) {
 			
@@ -430,7 +437,7 @@ module.exports = (options) => {
 		 * Add an event listener for one of these events: 'error', 'warning', 'ready'
 		 * @param {string} evt The event to listen for
 		 * @param {Function} callback The callback function
-		 * @return {Object} The servelit instance
+		 * @return {Object} The servelet instance
 		 */
 		on (evt, callback) {
 			
@@ -443,7 +450,7 @@ module.exports = (options) => {
 		 * Remove an event listener for one of these events: 'error', 'warning', 'ready'
 		 * @param {string} evt The event to listen for
 		 * @param {Function} callback The callback function that was used for the 'on' method
-		 * @return {Object} The servelit instance
+		 * @return {Object} The servelet instance
 		 */
 		off (evt, callback) {
 			
@@ -453,11 +460,11 @@ module.exports = (options) => {
 		},
 		
 		/**
-		 * Reload one or more static pages in the ServeLit Cache
+		 * Reload one or more static pages in the servelet Cache
 		 *   Omit page argument to reload all static pages.
 		 * @param {(string|string[])=} page An optional page name or array of page names
 		 * @param {Function} callback The callback function for error or completion
-		 * @return {Object} The servelit instance
+		 * @return {Object} The servelet instance
 		 */
 		reloadStaticPage (page, callback) {
 			

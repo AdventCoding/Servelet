@@ -1,7 +1,7 @@
 {
   "name": "servelet",
   "version": "1.0.0",
-  "description": "A simple module to serve dynamic page modules and static pages",
+  "description": "Servelet is a simple module to serve dynamic page modules and static pages.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -14,7 +14,8 @@
     "dynamic",
     "static",
     "template literal",
-    "module pages"
+    "module pages",
+    "partial include"
   ],
   "author": "Michael (https://github.com/AdventCoding/)",
   "license": "MIT",
