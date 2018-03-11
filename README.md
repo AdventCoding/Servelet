@@ -65,9 +65,12 @@ servelet.ready = true || false; // If the module has set up all the dynamic and 
 
 ### Methods
 
-### .serve
+### .serve(page, data, callback)
 
 Gets the content of dynamic or static pages.
+ - page : The page name to serve from the views folder
+ - data : The object to pass into a dynamic page
+ - callback : The optional callback for completion
 
 ```js
 app.get('/', (req, res) => {
@@ -81,9 +84,11 @@ app.get('/about', (req, res) => {
 });
 ```
 
-### .on && .off
+### .on(evt, callback) && .off(evt, callback)
 
-Register for events with the 'on' method. To unregister, use the 'off' method, sending in the callback function that was used in the 'on' method.
+Register for events with the 'on' method. To un-register, use the 'off' method, sending in the callback function that was used in the 'on' method.
+ - evt : The event to listen for
+ - callback : The callback for the event listener
 
 ```js
 servelet.on('error', myErrorCallback)
@@ -93,9 +98,10 @@ servelet.on('error', myErrorCallback)
 servelet.off('error', myErrorCallback);
 ```
 
-### .updateGlobalData
+### .updateGlobalData(data)
 
 Updates the global data object that is sent to all dynamic pages.
+ - data : The object to update the dynamic data with
 
 ```js
 // app.js
@@ -110,9 +116,11 @@ module.exports = (data) => `<p>The ID is: ${data.globalData.dynamicId}</p>`;
 // HTML Response: <p>The ID is: 738</p>
 ```
 
-### .reloadStaticPage
+### .reloadStaticPage(page, callback)
 
 Reload a static page in the servelet cache. This is useful with a GET request to reload one or more static pages that have been altered on the server.
+ - page : An optional page name or array of page names
+ - callback : The callback function for error or completion
 
 ```js
 servelet.reloadStaticPage(callback); // Reloads all static pages
