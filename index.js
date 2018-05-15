@@ -2,24 +2,36 @@
 
 const path = require('path'),
 	fs = require('fs'),
-	events = require('events');
+	events = require('events'),
+	serveletKey = Symbol('servelet');
+
+/**
+ * The Default Options
+ * @typedef Defaults
+ * @property {string} views The views folder
+ * @property {string} partials The partials folder
+ * @property {string} staticExt The static file extensions separated by a semi-colon
+ * @property {string} dynamicExt The dynamic file extensions separated by a semi-colon
+ * @property {*} globalData The data to send to all dynamic files (accessed by data.global)
+ */
+const defaults = {
+	views: 'views',
+	partials: 'views/partials',
+	staticExt: 'html',
+	dynamicExt: 'js',
+	globalData: '',
+};
 
 /**
  * Create a new Servelet instance
  * @class
+ * @param {Defaults} options The default options
  */
 class Servelet {
 	
-	constructor (opts = {}) {
+	constructor (options = {}) {
 		
-		this.options = {
-			views: 'views',
-			partials: 'views/partials',
-			staticExt: 'html',
-			dynamicExt: 'js',
-			globalData: {}
-		};
-		Object.assign(this.options, opts);
+		this.options = Object.assign({}, defaults, options);
 		this.options.staticExt = this.options.staticExt.split(';');
 		this.options.dynamicExt = this.options.dynamicExt.split(';');
 		
@@ -73,48 +85,10 @@ class Servelet {
 	}
 	
 	/**
-	 * Load a page based on static or dynamic extension
-	 * @param {string=} page The page name to load. Defaults to 'index'
-	 * @param {Object=} data The data object to send to the dynamic page
-	 * @return {string} The compiled content from the loaded page
+	 * Serve all requests that were initiated before module was ready
+	 * @return void
 	 */
-	loadPage (page = 'index', data = {}) {
-		
-		let res = '';
-		
-		if (this.views.hasOwnProperty(page)) {
-			
-			// All pages in the views object will have either static or dynamic extensions
-			// and have a function (unless an error occurred) that returns a string of the content
-			try {
-				
-				// Catch any errors that happen within the dynamic page
-				// A static page will just ignore the object sent to it
-				let allData = Object.assign({}, data);
-				
-				allData.global = this.options.globalData;
-				allData.include = this.includePartial.bind(this);
-				res = this.views[page](allData);
-				
-			} catch (err) {
-				
-				this.error = err;
-				return `An error has occurred within the dynamic ${page} page.`;
-				
-			}
-			
-			return res;
-			
-		} else {
-			
-			res = `The ${page} page could not be found.`;
-			this.error = new Error(res);
-			
-			return res;
-			
-		}
-		
-	}
+	serveAll () { this.serves.forEach((s) => s()); }
 	
 	/**
 	 * Locates and stores all dynamic and/or static pages in the view and partial folders
@@ -305,6 +279,50 @@ class Servelet {
 	}
 	
 	/**
+	 * Load a page based on static or dynamic extension
+	 * @param {string=} page The page name to load. Defaults to 'index'
+	 * @param {Object=} data The data object to send to the dynamic page
+	 * @param {bool} layout If the page is a layout
+	 * @return {string} The compiled content from the loaded page
+	 */
+	loadPage (page = 'index', data = {}, layout = false) {
+		
+		let res = '';
+		
+		if (this.views.hasOwnProperty(page)) {
+			
+			// All pages in the views object will have either static or dynamic extensions
+			// and have a function (unless an error occurred) that returns a string of the content
+			try {
+				
+				// If using a layout, the data object has already been created
+				let allData = (layout) ? data : this.createDataObject(data);
+				
+				// A static page will just ignore the object sent to it
+				res = this.views[page](allData);
+				
+			} catch (err) {
+				
+				// Catch any errors that happen within the dynamic page
+				this.error = err;
+				return `An error has occurred within the dynamic ${page} page.`;
+				
+			}
+			
+			return res;
+			
+		} else {
+			
+			res = `The ${page} page could not be found.`;
+			this.error = new Error(res);
+			
+			return res;
+			
+		}
+		
+	}
+	
+	/**
 	 * Include one or more partial files into a dynamic page
 	 * @param {string|string[]} page A page name or array of page names to include from the partials
 	 * @param {Object=} data An object of data to send to the partial page
@@ -344,188 +362,267 @@ class Servelet {
 	}
 	
 	/**
-	 * Serve all requests that were initiated before module was ready
-	 * @return void
+	 * Create the dynamic page data object
+	 * @param {Object} data The initial data object
+	 * @return {Object}
 	 */
-	serveAll () { this.serves.forEach((s) => s()); }
+	createDataObject (data) {
+		
+		let dataObj = Object.assign({}, data);
+		
+		dataObj.global = this.options.globalData;
+		dataObj.include = (page, newData) => { return this.include(dataObj, page, newData); };
+		dataObj.layout = (page, ...html) => { return this.layout(dataObj, page, html); };
+		
+		return dataObj;
+		
+	}
+	
+	/****************/
+	/** API Methods */
+	/****************/
+	
+	/**
+	 * Include a partial file
+	 * @param {Object} data The original data object
+	 * @param {string} page The page name to include
+	 * @param {Object=} newData Any new data to pass through
+	 * @return {string} The html string from the include
+	 */
+	include (data, page, newData) {
+		
+		return this.includePartial(
+			page,
+			Object.assign({}, data, newData)
+		);
+		
+	}
+	
+	/**
+	 * Include a layout view
+	 * @param {Object} data The original data object
+	 * @param {string} page The layout name with optional view names that bind to the data object
+	 * (e.g. 'layout:body' or 'layout:section1:section2)
+	 * @param {string[]} html The array of html string(s) to bind to the data object sent to the layout
+	 * @return {string} The html string from the layout
+	 */
+	layout (data, page, html) {
+		
+		let pages = page.split(':'),
+			htmlData = {};
+		
+		if (pages && page[0]) {
+			
+			// Assign the html to the layout variable and add the original data
+			for (let i = 1; i < pages.length; i += 1) {
+				htmlData[pages[i]] = html[i - 1] || '';
+			}
+			
+			Object.assign(data, htmlData);
+			
+			// Load the layout page with the new data
+			return this.loadPage(pages[0], data, true);
+			
+		} else {
+			
+			return html;
+			
+		}
+		
+	}
 	
 }
 
 /**
- * @typedef {Object} Options 
- * @property {string} views The views folder location						: 'views'
- * @property {string} partials The partials folder location					: 'views/partials'
- * @property {string} staticExt The static file extension					: 'html'
- * @property {string} dynamicExt The dynamic file extension					: 'js'
- * @property {Object} globalData The data available to all dynamic pages	: {}
+ * Create the API class for the export
+ * @class
+ * @param {Defaults} options The default options
  */
-
-/**
- * Servelet Node.js Module
- * @author Michael S. Howard
- * @license MIT
- * @param {Options} options The options to initiate the servelet instance
- */
-module.exports = (options) => {
+class API {
 	
-	const serve = new Servelet(options);
+	constructor (options) {
+		
+		this[serveletKey] = new Servelet(options);
+		
+	}
 	
-	return {
+	/**
+	 * The error that occurred or null
+	 * @return {Error|null}
+	 */
+	get error () { return this[serveletKey].error; }
+	
+	/**
+	 * If the servelet instance is ready to serve
+	 * @return {boolean}
+	 */
+	get ready () { return this[serveletKey].ready; }
+	
+	/**
+	 * Update the global data object that is passed to all dynamic pages
+	 * @param {Object} data The object to update the dynamic data with
+	 * @return {Object} The servelet instance
+	 */
+	updateGlobalData (data) {
 		
-		/**
-		 * The error that occurred or null
-		 * @return {Error|null}
-		 */
-		get error () { return serve.error; },
+		Object.assign(this[serveletKey].options.globalData, data);
+		return this;
 		
-		/**
-		 * If the servelet instance is ready to serve
-		 * @return {boolean}
-		 */
-		get ready () { return serve.ready; },
+	}
+	
+	/**
+	 * Serves dynamic or static pages in the views folder as compiled text
+	 * Use the on('error', callback) method to catch errors.
+	 * @param {string} page The page name to serve from the views folder
+	 * @param {Object=} data The object to pass into a dynamic page
+	 * @param {function(Error, string)=} callback The optional callback for completion
+	 * @return {Object|string} The servelet instance if using callback, else the page data string
+	 */
+	/**
+	 * Serves dynamic or static pages in the views folder as compiled text
+	 * Use the on('error', callback) method to catch errors.
+	 * @param {string} page The page name to serve from the views folder
+	 * @param {function(Error, string)=} callback The optional callback for completion
+	 * @return {Object|string} The servelet instance if using callback, else the page data string
+	 */
+	serve (page, data = {}, callback) {
 		
-		/**
-		 * Update the global data object that is passed to all dynamic pages
-		 * @param {Object} data The object to update the dynamic data with
-		 * @return {Object} The servelet instance
-		 */
-		updateGlobalData (data) {
+		// Overload
+		if (typeof data === 'function') {
 			
-			Object.assign(serve.options.globalData, data);
-			return this;
+			callback = data;
+			data = {};
 			
-		},
+		}
 		
-		/**
-		 * Serves dynamic or static pages in the views folder as compiled text
-		 *   Use the on('error', callback) method to catch errors.
-		 * @param {string} page The page name to serve from the views folder
-		 * @param {Object=} data The object to pass into a dynamic page
-		 * @param {function(Error, string)=} callback The optional callback for completion
-		 * @return {Object|string} The servelet instance if using callback, else the page data string
-		 */
-		serve (page, data = {}, callback) {
+		if (!this.ready) {
 			
-			// data is optional / check for callback
-			if (typeof data === 'function') {
-				
-				callback = data;
-				data = {};
-				
-			}
-			
-			if (!this.ready) {
-				
-				// Queue the serve call until Module is ready
-				serve.serves.push(() => { this.serve(page, data, callback); });
-				return this;
-				
-			}
-			
-			const str = serve.loadPage(page, data);
-			
-			if (typeof callback === 'function') {
-				
-				callback(str);
-				return this;
-				
-			} else { return str; }
-			
-		},
-		
-		/**
-		 * Add an event listener for one of these events: 'error', 'warning', 'ready'
-		 * @param {string} evt The event to listen for
-		 * @param {Function} callback The callback function
-		 * @return {Object} The servelet instance
-		 */
-		on (evt, callback) {
-			
-			serve.emitter.addListener(evt, callback);
-			return this;
-			
-		},
-		
-		/**
-		 * Remove an event listener for one of these events: 'error', 'warning', 'ready'
-		 * @param {string} evt The event to listen for
-		 * @param {Function} callback The callback function that was used for the 'on' method
-		 * @return {Object} The servelet instance
-		 */
-		off (evt, callback) {
-			
-			serve.emitter.removeListener(evt, callback);
-			return this;
-			
-		},
-		
-		/**
-		 * Reload one or more static pages in the servelet Cache
-		 *   Omit page argument to reload all static pages.
-		 * @param {(string|string[])=} page An optional page name or array of page names
-		 * @param {Function} callback The callback function for error or completion
-		 * @return {Object} The servelet instance
-		 */
-		reloadStaticPage (page, callback) {
-			
-			// page is optional / check for callback
-			if (typeof page === 'function') {
-				
-				callback = page;
-				page = null;
-				
-			}
-			
-			let complete = (err) => {
-				if (err) { return callback(err); }
-				callback(null);
-			};
-			
-			if (Array.isArray(page)) {
-				
-				page.forEach(this.reloadStaticPage.bind(this));
-				
-			} else if (typeof page === 'string') {
-				
-				let dir = '',
-					file = '',
-					ext = serve.options.staticExt,
-					view = (serve.views.hasOwnProperty(page))
-						? serve.views[page] : null,
-					partial = (serve.partials.hasOwnProperty(page))
-						? serve.partials[page] : null;
-				
-				if (view && ext.indexOf(view.ext.replace('.', '')) >= 0) {
-					
-					dir = serve.viewDir;
-					file = page + view.ext;
-					
-				} else if (partial && ext.indexOf(partial.ext.replace('.', '')) >= 0) {
-						
-					dir = serve.partialDir;
-					file = page + partial.ext;
-					
-				} else {
-					
-					callback(new Error(`Could not reload the static ${page} page, since it was never initialized.`));
-					return this;
-					
-				}
-				
-				// Re-initialize a single static page
-				serve.initStaticPage(dir, path.parse(file), complete);
-				
-			} else {
-				
-				// Re-initialize all static pages
-				serve.initAllPages('static', complete);
-				
-			}
+			// Queue the serve call until Module is ready
+			this[serveletKey].serves.push(() => {
+				this.serve(page, data, callback);
+			});
 			
 			return this;
 			
 		}
 		
-	};
+		const str = this[serveletKey].loadPage(page, data);
+		
+		if (typeof callback === 'function') {
+			
+			callback(str);
+			return this;
+			
+		} else {
+			
+			return str;
+			
+		}
+		
+	}
 	
-};
+	/**
+	 * Add an event listener for one of these events: 'error', 'warning', 'ready'
+	 * @param {string} event The event to listen for
+	 * @param {Function} callback The callback function
+	 * @return {Object} The servelet instance
+	 */
+	on (event, callback) {
+		
+		this[serveletKey].emitter.addListener(event, callback);
+		return this;
+		
+	}
+	
+	/**
+	 * Remove an event listener for one of these events: 'error', 'warning', 'ready'
+	 * @param {string} event The event to listen for
+	 * @param {Function} callback The callback that was used in the 'on' method call
+	 * @return {Object} The servelet instance
+	 */
+	off (event, callback) {
+		
+		this[serveletKey].emitter.removeListener(event, callback);
+		return this;
+		
+	}
+	
+	/**
+	 * Reload one or more static pages in the servelet Cache
+	 *   Omit page argument to reload all static pages.
+	 * @param {(string|string[])=} page An optional page name or array of page names
+	 * @param {Function} callback The callback function for error or completion
+	 * @return {Object} The servelet instance
+	 */
+	reloadStaticPage (page, callback) {
+		
+		// page is optional / check for callback
+		if (typeof page === 'function') {
+			
+			callback = page;
+			page = null;
+			
+		}
+		
+		const serve = this[serveletKey];
+		let complete = (err) => {
+			
+			if (err) { return callback(err); }
+			callback(null);
+			
+		};
+		
+		if (Array.isArray(page)) {
+			
+			page.forEach(this.reloadStaticPage.bind(this));
+			
+		} else if (typeof page === 'string') {
+			
+			let dir = '',
+				file = '',
+				ext = serve.options.staticExt,
+				view = (serve.views.hasOwnProperty(page))
+					? serve.views[page] : null,
+				partial = (serve.partials.hasOwnProperty(page))
+					? serve.partials[page] : null;
+			
+			if (view && ext.indexOf(view.ext.replace('.', '')) >= 0) {
+				
+				dir = serve.viewDir;
+				file = page + view.ext;
+				
+			} else if (partial && ext.indexOf(partial.ext.replace('.', '')) >= 0) {
+					
+				dir = serve.partialDir;
+				file = page + partial.ext;
+				
+			} else {
+				
+				callback(new Error(`Could not reload the static ${page} page, since it was never initialized.`));
+				return this;
+				
+			}
+			
+			// Re-initialize a single static page
+			serve.initStaticPage(dir, path.parse(file), complete);
+			
+		} else {
+			
+			// Re-initialize all static pages
+			serve.initAllPages('static', complete);
+			
+		}
+		
+		return this;
+		
+	}
+	
+}
+
+/**
+ * Servelet Node.js Module
+ * @author Michael S. Howard
+ * @license MIT
+ * @param {Defaults} options The default options to use with the servelet instance
+ */
+module.exports = (options) => new API(options);
