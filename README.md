@@ -53,11 +53,11 @@ app.get('/', (req, res) => {
   }));
   
 // OR
-
-servelet.serve('index', { title: 'Home' }, (html) => {
-  res.send(html);
-});
-
+  
+  servelet.serve('index', { title: 'Home' }, (html) => {
+    res.send(html);
+  });
+  
 });
 ```
 
@@ -71,7 +71,7 @@ let servelet = require('servelet')(options);
 
 ### .error
 
-The most recent error object, or null
+Get the most recent error object, or null
 
 ### .ready
 
@@ -79,7 +79,7 @@ If the module has set up all the dynamic and static pages
 
 ### .serve(page, data, callback)
 
-Gets the content of dynamic or static pages.
+Get the content of dynamic or static pages.
  - page : The page name to serve from the views folder
  - data : The object to pass into a dynamic page
  - callback : The optional callback for completion
@@ -102,7 +102,7 @@ app.get('/about', (req, res) => {
 
 ### .updateGlobalData(data)
 
-Updates the global data object that is sent to all dynamic pages.
+Update the global data object that is sent to all dynamic pages.
  - data {Object} : The object to update the global data with
 
 ```js
@@ -113,7 +113,9 @@ const servelet = require('servelet')({
 
 servelet.updateGlobalData({ dynamicId: 738 });
 res.send(servelet.serve('index'));
+
 ----------
+
 // index.js
 module.exports = (data) => `
 <p>The ID is: ${data.globalData.dynamicId}</p>
@@ -147,7 +149,7 @@ servelet.off('error', myErrorCallback);
 
 Reload a static page in the servelet cache. This is useful with a GET request to reload one or more static pages that have been altered on the server.
  - page {string|string[]} : An optional page name or array of page names
- - callback {Function} : The callback function for error or completion
+ - callback {Function(Error|null)} : The callback function for error or completion
 
 ```js
 servelet.reloadStaticPage(callback); // Reloads all static pages
@@ -184,7 +186,9 @@ Include a layout file for the current dynamic page.
 module.exports = (data) => data.layout('layout:main', `
 <p>This is the main portion for the layout file.</p>
 `;
+
 ----------
+
 // layout.js
 // Uses the main property from the index.js file, and includes a partial
 module.exports = (data) => `
