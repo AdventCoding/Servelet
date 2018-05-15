@@ -1,6 +1,6 @@
 # servelet
 
-Servelet is a simple Node.js module to serve dynamic page modules and static pages. A dynamic page module has an exported function that receives a data object that is used to build the dynamic page using JavaScript template literals.
+Servelet is a simple Node.js module to serve dynamic page modules and static pages. A dynamic page module exports a function that receives a data object that is used to build the dynamic page using JavaScript template literals.
 
 ## Install
 
@@ -27,7 +27,7 @@ Here is an example of a dynamic .js file that uses custom data, global data, and
 
 ```js
 // index.js
-// Exports a template literal that uses properties and methods of the data parameter
+// Exports a function that returns a template literal, using properties and methods of the data parameter
 module.exports = (data) => `
 <!DOCTYPE html>
 <html lang="en">
@@ -182,7 +182,7 @@ Include a layout file for the current dynamic page.
 
 ```js
 // index.js
-// Exports the result of the layout method call
+// Exports a function that returns the result of the layout method call
 module.exports = (data) => data.layout('layout:main', `
 <p>This is the main portion for the layout file.</p>
 `;
