@@ -551,7 +551,7 @@ class API {
 	 * Reload one or more static pages in the servelet Cache
 	 *   Omit page argument to reload all static pages.
 	 * @param {(string|string[])=} page An optional page name or array of page names
-	 * @param {Function} callback The callback function for error or completion
+	 * @param {Function(Error|null)} callback The callback function for error or completion
 	 * @return {Object} The servelet instance
 	 */
 	reloadStaticPage (page, callback) {
