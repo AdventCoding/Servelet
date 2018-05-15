@@ -14,11 +14,11 @@ When servelet is required, it will search all files in the 'views' and 'partials
 
 ```js
 const servelet = require('servelet')({
-	views: 'views',
-	partials: 'views/partials',
-	staticExt: 'htm;html',
-	dynamicExt: 'js',
-	globalData: { gValue: 123 }
+  views: 'views',
+  partials: 'views/partials',
+  staticExt: 'htm;html',
+  dynamicExt: 'js',
+  globalData: { gValue: 123 }
 });
 ```
 
@@ -33,8 +33,8 @@ module.exports = (data) => `
 <html lang="en">
 ${data.include('head')}
 <body>
-	<p>This is a global value: ${data.global.gValue}.</p>
-	<p>These are custom values: ${(data.validUser) ? `Welcome ${data.userName}` : 'Welcome Guest'}</p>
+  <p>This is a global value: ${data.global.gValue}.</p>
+  <p>These are custom values: ${(data.validUser) ? `Welcome ${data.userName}` : 'Welcome Guest'}</p>
 </body>
 `;
 ```
@@ -45,19 +45,19 @@ Then we can serve the page in a GET request through Express, and feed in our cus
 ```js
 const app = require('express')();
 app.get('/', (req, res) => {
-	
-	res.send(servelet.serve('index', {
-		title: 'Home Page',
-		validUser: true,
-		userName: 'Michael',
-	}));
-	
-	// OR
-	
-	servelet.serve('index', { title: 'Home' }, (html) => {
-		res.send(html);
-	});
-	
+  
+  res.send(servelet.serve('index', {
+    title: 'Home Page',
+    validUser: true,
+    userName: 'Michael',
+  }));
+  
+// OR
+
+servelet.serve('index', { title: 'Home' }, (html) => {
+  res.send(html);
+});
+
 });
 ```
 
@@ -86,17 +86,17 @@ Gets the content of dynamic or static pages.
 
 ```js
 app.get('/', (req, res) => {
-	
-	res.send(servelet.serve('home'));
-	
+  
+  res.send(servelet.serve('home'));
+  
 });
 app.get('/about', (req, res) => {
-	
-	const userData = getTheUserData(); // Make use of some data that alters the about page
-	servelet.serve('about', { title: 'About Us', user: userData }, (html) => {
-		res.send(html); // Send the compiled page text to the response
-	});
-	
+  
+  const userData = getTheUserData(); // Make use of some data that alters the about page
+  servelet.serve('about', { title: 'About Us', user: userData }, (html) => {
+    res.send(html); // Send the compiled page text to the response
+  });
+  
 });
 ```
 
@@ -108,7 +108,7 @@ Updates the global data object that is sent to all dynamic pages.
 ```js
 // app.js
 const servelet = require('servelet')({
-	globalData: { dynamicId: 342 }
+  globalData: { dynamicId: 342 }
 });
 
 servelet.updateGlobalData({ dynamicId: 738 });
@@ -129,8 +129,8 @@ Add an event listener for an event.
 
 ```js
 servelet.on('error', myErrorCallback)
-	.on('warning', (w) => { console.log('Warning: ' + w); })
-	.on('ready', () => { console.log('Servelet is ready.'); });
+  .on('warning', (w) => { console.log('Warning: ' + w); })
+  .on('ready', () => { console.log('Servelet is ready.'); });
 ```
 
 ### .off(event, callback)
@@ -189,8 +189,8 @@ module.exports = (data) => data.layout('layout:main', `
 // Uses the main property from the index.js file, and includes a partial
 module.exports = (data) => `
 <body>
-	${data.main}
-	${data.include('article')}
+  ${data.main}
+  ${data.include('article')}
 </body>
 `;
 ```
