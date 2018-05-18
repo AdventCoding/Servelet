@@ -6,16 +6,23 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "dependencies": {
+    "express": "~4.16.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AdventCoding/servelet.git"
   },
   "keywords": [
     "dynamic",
+    "includes",
+    "layouts",
+    "modules",
+    "pages",
+    "partials",
     "static",
     "template literal",
-    "module pages",
-    "partial include"
+    "views"
   ],
   "author": "Michael (https://github.com/AdventCoding/)",
   "license": "MIT",
