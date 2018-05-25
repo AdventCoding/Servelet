@@ -14,10 +14,6 @@ When servelet is required, it will search all files in the 'views' and 'partials
 
 ```js
 const servelet = require('servelet')({
-  views: 'views',
-  partials: 'views/partials',
-  staticExt: 'htm;html',
-  dynamicExt: 'js',
   globalData: { gValue: 123 }
 });
 ```
@@ -34,7 +30,7 @@ module.exports = (data) => `
 ${data.include('head')}
 <body>
   <p>This is a global value: ${data.global.gValue}.</p>
-  <p>These are custom values: ${(data.validUser) ? `Welcome ${data.userName}` : 'Welcome Guest'}</p>
+  <p>These are custom values: ${(data.userName) ? `Welcome ${data.userName}` : 'Welcome Guest'}</p>
 </body>
 `;
 ```
@@ -46,15 +42,7 @@ Then we can serve the page in a GET request through Express, and feed in our cus
 const app = require('express')();
 app.get('/', (req, res) => {
   
-  res.send(servelet.serve('index', {
-    title: 'Home Page',
-    validUser: true,
-    userName: 'Michael',
-  }));
-  
-// OR
-  
-  servelet.serve('index', { title: 'Home' }, (html) => {
+  servelet.serve('index', { userName: 'Michael' }, (html) => {
     res.send(html);
   });
   
@@ -66,6 +54,17 @@ app.get('/', (req, res) => {
 ```js
 let servelet = require('servelet')(options);
 ```
+
+### Options
+
+| Key | Description | Default |
+| :---: | --- | :---: |
+| root | The root directory if different than the current one | '' |
+| views | The name of the views folder | 'views' |
+| partials | The name of the partials folder inside the views folder | 'partials' |
+| staticExt | The static file extensions separated by a semi-colon | 'html' |
+| dynamicExt | The dynamic file extensions separated by a semi-colon | 'js' |
+| globalData | The data to send to all dynamic files (accessed by data.global) | '' |
 
 ### Properties and Methods
 
@@ -85,15 +84,10 @@ Get the content of dynamic or static pages.
  - callback : The optional callback for completion
 
 ```js
-app.get('/', (req, res) => {
-  
-  res.send(servelet.serve('home'));
-  
-});
 app.get('/about', (req, res) => {
   
   const userData = getTheUserData(); // Make use of some data that alters the about page
-  servelet.serve('about', { title: 'About Us', user: userData }, (html) => {
+  servelet.serve('about', { user: req.userData }, (html) => {
     res.send(html); // Send the compiled page text to the response
   });
   
@@ -112,7 +106,7 @@ const servelet = require('servelet')({
 });
 
 servelet.updateGlobalData({ dynamicId: 738 });
-res.send(servelet.serve('index'));
+servelet.serve('index', (html) => { res.send(html); });
 
 ----------
 

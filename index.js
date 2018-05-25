@@ -8,15 +8,17 @@ const path = require('path'),
 /**
  * The Default Options
  * @typedef Defaults
- * @property {string} views The views folder
- * @property {string} partials The partials folder
+ * @property {string} root The root directory if different than current
+ * @property {string} views The name of the views folder
+ * @property {string} partials The name of the partials folder inside the views folder
  * @property {string} staticExt The static file extensions separated by a semi-colon
  * @property {string} dynamicExt The dynamic file extensions separated by a semi-colon
  * @property {*} globalData The data to send to all dynamic files (accessed by data.global)
  */
 const defaults = {
+	root: '',
 	views: 'views',
-	partials: 'views/partials',
+	partials: 'partials',
 	staticExt: 'html',
 	dynamicExt: 'js',
 	globalData: '',
@@ -34,16 +36,12 @@ class Servelet {
 		this.options = Object.assign({}, defaults, options);
 		this.options.staticExt = this.options.staticExt.split(';');
 		this.options.dynamicExt = this.options.dynamicExt.split(';');
-		
-		this.root = path.dirname(require.main.filename);
-		this.viewDir = path.join(this.root, this.options.views, '/');
-		this.partialDir = path.join(this.root, this.options.partials, '/');
+		this.root = this.options.root || path.dirname(require.main.filename);
 		
 		this.emitter = new events.EventEmitter();
 		this.error = null;
 		this.warning = null;
 		this.ready = false;
-		this.serves = []; // Queue for serve calls before module is ready
 		
 		// These objects contain page name and functions to retrieve page contents
 		this.views = {};
@@ -53,7 +51,6 @@ class Servelet {
 		this.initAllPages((err) => {
 			
 			if (err) { return this.error = err; }
-			this.serveAll();
 			this.ready = true;
 			
 		});
@@ -85,10 +82,27 @@ class Servelet {
 	}
 	
 	/**
-	 * Serve all requests that were initiated before module was ready
-	 * @return void
+	 * Get a directory string
+	 * @param {string} folder The folder name
+	 * @return {string}
 	 */
-	serveAll () { this.serves.forEach((s) => s()); }
+	getDirectory (folder) { return path.join(this.root, folder, '/'); }
+	
+	/**
+	 * Get the page name for the views or partials object
+	 * @param {string} page The page name
+	 * @return {string}
+	 */
+	getPages (page) {
+		
+		const opts = this.options;
+		
+		return [
+			(opts.views + page).replace(/\//g, ''),
+			(opts.views + opts.partials + page).replace(/\//g, ''),
+		];
+		
+	}
 	
 	/**
 	 * Locates and stores all dynamic and/or static pages in the view and partial folders
@@ -106,16 +120,21 @@ class Servelet {
 			
 		}
 		
-		let completed = 0;
-		const total = 2, // The total amount of scan calls to make
-			/**
-			 * Scan for pages within a directory and initialize them
-			 * @param {string} dir The directory to search in
-			 * @return void
-			 */
-			scan = (dir) => {
+		let completed = 0,
+			total = 2; // The total amount of scan calls to make
+		
+		/**
+		 * Scan for pages within a directory and initialize them
+		 * @param {string} dir The directory to search in
+		 * @return void
+		 */
+		const scan = (dir) => {
+			
+			let fullDir = this.getDirectory(dir);
+			
+			try {
 				
-				fs.readdir(dir, (err, files) => {
+				fs.readdir(fullDir, (err, files) => {
 					
 					if (err) {
 						
@@ -125,39 +144,41 @@ class Servelet {
 						
 					}
 					
-					let completedFiles = 0,
-						totalFiles = files.length,
-						/**
-						 * Check if all async calls are complete
-						 * @return void
-						 */
-						checkCompletion = () => {
+					const totalFiles = files.length;
+					let completedFiles = 0;
+					
+					/**
+					 * Check if all async calls are complete
+					 * @return void
+					 */
+					const checkCompletion = () => {
+						
+						if (completedFiles === totalFiles) {
 							
-							if (completedFiles === totalFiles) {
+							// All files in directory have been scanned
+							if (++completed === total) {
 								
-								// All files in directory have been scanned
-								if (++completed === total) {
-									
-									// All readdir calls are complete
-									cb(null);
-									
-								}
+								// All readdir calls are complete
+								cb(null);
 								
 							}
 							
-						},
-						/**
-						 * Complete the current file scan
-						 * @param {Error|null} err The error from file init or null
-						 * @return void
-						 */
-						fileComplete = (err) => {
-							
-							if (err) { return cb(err); }
-							completedFiles += 1;
-							checkCompletion();
-							
-						};
+						}
+						
+					};
+					
+					/**
+					 * Complete the current file scan
+					 * @param {Error|null} err The error from file init or null
+					 * @return void
+					 */
+					const fileComplete = (err) => {
+						
+						if (err) { return cb(err); }
+						completedFiles += 1;
+						checkCompletion();
+						
+					};
 					
 					if (totalFiles === 0) {
 						
@@ -173,10 +194,29 @@ class Servelet {
 							
 							if ((type === 'static' || type === 'all')
 								&& this.options.staticExt.indexOf(ext) >= 0) {
-								this.initStaticPage(dir, page, fileComplete);
+								this.initPage(dir, page, fileComplete, true);
 							} else if ((type === 'dynamic' || type === 'all')
 								&& this.options.dynamicExt.indexOf(ext) >= 0) {
-								this.initDynamicPage(dir, page, fileComplete);
+								this.initPage(dir, page, fileComplete);
+							} else if (page.ext === '' && page.base !== this.options.partials) {
+								
+								// Check for non-partial directory
+								const newDir = `${dir}/${page.base}`,
+									newFullDir = this.getDirectory(dir);
+								
+								if (fs.existsSync(newFullDir)) {
+									
+									// Add to amount of total scans and scan subdirectory
+									total += 1;
+									fileComplete(null);
+									scan(newDir);
+									
+								} else {
+									
+									fileComplete(null);
+									
+								}
+								
 							} else {
 								
 								// Skip the file for wrong extension type
@@ -190,10 +230,18 @@ class Servelet {
 					
 				});
 				
-			};
+			} catch (err) {
+				
+				total = -1;
+				this.error = err;
+				cb(`Failed to read from the ${dir} folder.`);
+				
+			}
+			
+		};
 		
-		scan(this.viewDir);
-		scan(this.partialDir);
+		scan(this.options.views);
+		scan(`${this.options.views}/${this.options.partials}`);
 		
 	}
 	
@@ -202,60 +250,58 @@ class Servelet {
 	 * @param {string} dir The directory of the page
 	 * @param {Object} page The path.parse object for the page
 	 * @param {Function} cb The callback function for error or completion
+	 * @param {bool} isStatic If the page is a static page
 	 * @return void
 	 */
-	initStaticPage (dir, page, cb) {
+	initPage (dir, page, cb, isStatic) {
 		
-		const displayType = (dir === this.viewDir) ? 'views' : 'partials';
-		
-		// Cache the file content for the static page
-		// and use a helper function to retrieve the content
-		this.getStaticFile(dir + page.base, (err, content) => {
-			
-			if (err) { return cb(err); }
-			this[displayType][page.name] = () => content;
-			this[displayType][page.name]['type'] = 'static';
-			this[displayType][page.name]['ext'] = page.ext;
-			cb(null);
-			
-		});
-		
-	}
-	
-	/**
-	 * Initialize a dynamic page to the views or partials object
-	 * @param {string} dir The directory of the page
-	 * @param {Object} page The path.parse object for the page
-	 * @param {Function} cb The callback function for error or completion
-	 * @return void
-	 */
-	initDynamicPage (dir, page, cb) {
-		
-		const displayType = (dir === this.viewDir) ? 'views' : 'partials',
+		const opts = this.options,
+			displayType = (dir.indexOf(`${opts.views}/${opts.partials}`) >= 0) ? 'partials' : 'views',
 			loc = this[displayType],
-			name = page.name;
+			name = dir.replace(/\//g, '') + page.name,
+			fullDir = this.getDirectory(dir);
 		
-		// Get the dynamic page content by requiring the file
-		try {
+		if (isStatic) {
 			
-			loc[name] = require(dir + page.base);
+			// Cache the file content for the static page
+			// and use a helper function to retrieve the content
+			this.getStaticFile(fullDir + page.base, (err, content) => {
+				
+				if (err) { return cb(err); }
+				loc[name] = () => content;
+				loc[name]['type'] = 'static';
+				loc[name]['ext'] = page.ext;
+				loc[name]['page'] = page.name;
+				loc[name]['dir'] = dir;
+				cb(null);
+				
+			});
 			
-			if (typeof loc[name] !== 'function') {
-				this.warning = `The ${name} dynamic page did not export a module to build the page content.`;
-				loc[name] = () => {};
+		} else {
+			
+			// Get the dynamic page content by requiring the file
+			try {
+				
+				loc[name] = require(fullDir + page.base);
+				
+				if (typeof loc[name] !== 'function') {
+					this.warning = `The ${name} dynamic page did not export a module to build the page content.`;
+					loc[name] = () => {};
+				}
+				
+				loc[name]['type'] = 'dynamic';
+				loc[name]['ext'] = page.ext;
+				cb(null);
+				
+			} catch (e) {
+				
+				// Reset page to return empty string for its content
+				loc[name] = () => '';
+				loc[name]['type'] = 'dynamic';
+				loc[name]['ext'] = page.ext;
+				return cb(e);
+				
 			}
-			
-			loc[name]['type'] = 'dynamic';
-			loc[name]['ext'] = page.ext;
-			cb(null);
-			
-		} catch (e) {
-			
-			// Reset page to return empty string for its content
-			loc[name] = () => '';
-			loc[name]['type'] = 'dynamic';
-			loc[name]['ext'] = page.ext;
-			return cb(e);
 			
 		}
 		
@@ -287,9 +333,10 @@ class Servelet {
 	 */
 	loadPage (page = 'index', data = {}, layout = false) {
 		
+		const fullPage = this.getPages(page)[0];
 		let res = '';
 		
-		if (this.views.hasOwnProperty(page)) {
+		if (this.views.hasOwnProperty(fullPage)) {
 			
 			// All pages in the views object will have either static or dynamic extensions
 			// and have a function (unless an error occurred) that returns a string of the content
@@ -299,7 +346,7 @@ class Servelet {
 				let allData = (layout) ? data : this.createDataObject(data);
 				
 				// A static page will just ignore the object sent to it
-				res = this.views[page](allData);
+				res = this.views[fullPage](allData);
 				
 			} catch (err) {
 				
@@ -330,17 +377,19 @@ class Servelet {
 	 */
 	includePartial (page, data = {}) {
 		
+		const fullPage = this.getPages(page)[1];
+		
 		if (Array.isArray(page)) {
 			
 			page.forEach((p) => { this.includePartial(p, data); });
 			
 		} else {
 			
-			if (this.partials.hasOwnProperty(page)) {
+			if (this.partials.hasOwnProperty(fullPage)) {
 				
 				try {
 					
-					let content = this.partials[page](data);
+					let content = this.partials[fullPage](data);
 					return content;
 					
 				} catch (e) {
@@ -476,14 +525,14 @@ class API {
 	 * @param {string} page The page name to serve from the views folder
 	 * @param {Object=} data The object to pass into a dynamic page
 	 * @param {function(Error, string)=} callback The optional callback for completion
-	 * @return {Object|string} The servelet instance if using callback, else the page data string
+	 * @return {Object} The servelet instance
 	 */
 	/**
 	 * Serves dynamic or static pages in the views folder as compiled text
 	 * Use the on('error', callback) method to catch errors.
 	 * @param {string} page The page name to serve from the views folder
 	 * @param {function(Error, string)=} callback The optional callback for completion
-	 * @return {Object|string} The servelet instance if using callback, else the page data string
+	 * @return {Object} The servelet instance
 	 */
 	serve (page, data = {}, callback) {
 		
@@ -495,29 +544,7 @@ class API {
 			
 		}
 		
-		if (!this.ready) {
-			
-			// Queue the serve call until Module is ready
-			this[serveletKey].serves.push(() => {
-				this.serve(page, data, callback);
-			});
-			
-			return this;
-			
-		}
-		
-		const str = this[serveletKey].loadPage(page, data);
-		
-		if (typeof callback === 'function') {
-			
-			callback(str);
-			return this;
-			
-		} else {
-			
-			return str;
-			
-		}
+		callback(this[serveletKey].loadPage(page, data));
 		
 	}
 	
@@ -551,10 +578,10 @@ class API {
 	 * Reload one or more static pages in the servelet Cache
 	 *   Omit page argument to reload all static pages.
 	 * @param {(string|string[])=} page An optional page name or array of page names
-	 * @param {Function(Error|null)} callback The callback function for error or completion
+	 * @param {Function(Error|null)=} callback The callback function for error or completion
 	 * @return {Object} The servelet instance
 	 */
-	reloadStaticPage (page, callback) {
+	reloadStaticPage (page, callback = () => {}) {
 		
 		// page is optional / check for callback
 		if (typeof page === 'function') {
@@ -564,7 +591,9 @@ class API {
 			
 		}
 		
-		const serve = this[serveletKey];
+		const serve = this[serveletKey],
+			opts = serve.options;
+		
 		let complete = (err) => {
 			
 			if (err) { return callback(err); }
@@ -578,23 +607,24 @@ class API {
 			
 		} else if (typeof page === 'string') {
 			
+			const fullPage = serve.getPages(page);
 			let dir = '',
 				file = '',
 				ext = serve.options.staticExt,
-				view = (serve.views.hasOwnProperty(page))
-					? serve.views[page] : null,
-				partial = (serve.partials.hasOwnProperty(page))
-					? serve.partials[page] : null;
+				view = (serve.views.hasOwnProperty(fullPage[0]))
+					? serve.views[fullPage[0]] : null,
+				partial = (serve.partials.hasOwnProperty(fullPage[1]))
+					? serve.partials[fullPage[1]] : null;
 			
 			if (view && ext.indexOf(view.ext.replace('.', '')) >= 0) {
 				
-				dir = serve.viewDir;
-				file = page + view.ext;
+				dir = view.dir;
+				file = view.page + view.ext;
 				
 			} else if (partial && ext.indexOf(partial.ext.replace('.', '')) >= 0) {
-					
-				dir = serve.partialDir;
-				file = page + partial.ext;
+				
+				dir = partial.dir;
+				file = partial.page + partial.ext;
 				
 			} else {
 				
@@ -604,7 +634,7 @@ class API {
 			}
 			
 			// Re-initialize a single static page
-			serve.initStaticPage(dir, path.parse(file), complete);
+			serve.initPage(dir, path.parse(file), complete, true);
 			
 		} else {
 			
